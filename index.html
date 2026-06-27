@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Ultimate Quiz System</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+    background:#0b0c1a;
+    color:white;
+    text-align:center;
+}
+
+.box{
+    width:350px;
+    margin:50px auto;
+    background:#1d1f35;
+    padding:20px;
+    border-radius:10px;
+}
+
+input,button{
+    width:90%;
+    padding:10px;
+    margin:8px;
+    border:none;
+    border-radius:5px;
+}
+
+button{
+    background:#00ffcc;
+    cursor:pointer;
+}
+
+.hidden{display:none;}
+
+.btn{
+    background:#333;
+    color:white;
+}
+.btn:hover{
+    background:#00ffcc;
+    color:black;
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="authBox" class="box">
+    <h2>🔐 Login</h2>
+    <input id="email" placeholder="Email">
+    <input id="pass" type="password" placeholder="Password">
+    <button onclick="signup()">Signup</button>
+    <button onclick="login()">Login</button>
+</div>
+
+<!-- QUIZ -->
+<div id="quizBox" class="box hidden">
+    <h3 id="question"></h3>
+    <div id="answers"></div>
+</div>
+
+<!-- TEACHER PANEL -->
+<div id="teacherBox" class="box hidden">
+    <h2>🧑‍🏫 Teacher Panel</h2>
+    <input id="q" placeholder="Question">
+    <input id="a1" placeholder="Correct Answer">
+    <input id="a2" placeholder="Wrong Answer">
+    <button onclick="addQ()">Add Question</button>
+</div>
+
+<!-- RESULT -->
+<div id="resultBox" class="box hidden">
+    <h2>🏆 Result</h2>
+    <div id="result"></div>
+</div>
+
+<script>
+
+// 🔴 FIREBASE CONFIG (replace)
+const firebaseConfig = {
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  databaseURL: "YOUR_DB",
+  projectId: "YOUR_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.database();
+
+let user = null;
+let questions = [];
+let i = 0;
+let score = 0;
+
+/* ---------------- AUTH ---------------- */
+
+function signup(){
+    let email=document.getElementById("email").value;
+    let pass=document.getElementById("pass").value;
+
+    auth.createUserWithEmailAndPassword(email,pass);
+}
+
+function login(){
+    let email=document.getElementById("email").value;
+    let pass=document.getElementById("pass").value;
+
+    auth.signInWithEmailAndPassword(email,pass);
+}
+
+auth.onAuthStateChanged(u=>{
+    if(u){
+        user=u;
+        document.getElementById("authBox").classList.add("hidden");
+
+        if(u.email.includes("teacher")){
+            document.getElementById("teacherBox").classList.remove("hidden");
+        } else {
+            document.getElementById("quizBox").classList.remove("hidden");
+            loadQ();
+        }
+    }
+});
+
+/* ---------------- QUESTIONS ---------------- */
+
+function addQ(){
+    let q=document.getElementById("q").value;
+    let a1=document.getElementById("a1").value;
+    let a2=document.getElementById("a2").value;
+
+    db.ref("questions").push({
+        q:q,
+        a:[
+            {t:a1,c:true},
+            {t:a2,c:false}
+        ]
+    });
+
+    alert("Question added!");
+}
+
+function loadQ(){
+    db.ref("questions").once("value",snap=>{
+        questions=[];
+        snap.forEach(s=>{
+            questions.push(s.val());
+        });
+        showQ();
+    });
+}
+
+function showQ(){
+    let q=questions[i];
+    document.getElementById("question").innerText=q.q;
+
+    let ans=document.getElementById("answers");
+    ans.innerHTML="";
+
+    q.a.forEach(a=>{
+        let b=document.createElement("button");
+        b.innerText=a.t;
+        b.className="btn";
+
+        b.onclick=()=>{
+            if(a.c) score++;
+            next();
+        };
+
+        ans.appendChild(b);
+    });
+}
+
+function next(){
+    i++;
+    if(i<questions.length) showQ();
+    else finish();
+}
+
+function finish(){
+    document.getElementById("quizBox").classList.add("hidden");
+    document.getElementById("resultBox").classList.remove("hidden");
+
+    let percent=(score/questions.length)*100;
+
+    document.getElementById("result").innerText=
+    `${user.email} scored ${percent}%`;
+
+    db.ref("leaderboard").push({
+        name:user.email,
+        score:percent
+    });
+}
+
+</script>
+
+</body>
+</html>
